@@ -48,6 +48,7 @@
 
 extern char *__progname;
 char **_dl_argv = &__progname;	/* This is checked for some error messages.  */
+unsigned long int _dl_difuse_syscall;
 
 /* Name of the architecture.  */
 const char *_dl_platform;

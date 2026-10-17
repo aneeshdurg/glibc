@@ -19,6 +19,11 @@
 static inline void *
 __brk_call (void *addr)
 {
+  /* DIFUSE: this libc shares its process with the application, whose
+     program break it must leave alone.  A NULL break makes every __brk
+     other than __brk (0) fail with ENOMEM, and malloc uses mmap.  */
+  if (1)
+    return NULL;
   /* The default implementation reports errors through an unchanged
      break.  */
   return (void *) INTERNAL_SYSCALL_CALL (brk, addr);

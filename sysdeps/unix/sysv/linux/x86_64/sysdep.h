@@ -191,13 +191,31 @@
 
     Syscalls of more than 6 arguments are not supported.  */
 
+/* DIFUSE: when ld.so got a syscall stub (AT_DIFUSE_SYSCALL), syscalls
+   call it instead of executing `syscall'.  The stub keeps the syscall
+   register convention and clobbers only rcx and r11; it needs stack, so step
+   over the red zone.  */
+# if IS_IN (rtld)
+#  define DIFUSE_LOAD_STUB movq __GI__dl_difuse_syscall(%rip), %r11;
+# elif defined SHARED
+#  define DIFUSE_LOAD_STUB \
+    movq _dl_difuse_syscall@GOTPCREL(%rip), %r11; movq (%r11), %r11;
+# else
+#  define DIFUSE_LOAD_STUB movq _dl_difuse_syscall(%rip), %r11;
+# endif
+# define DIFUSE_SYSCALL \
+    DIFUSE_LOAD_STUB				\
+    testq %r11, %r11; jz 7f;			\
+    leaq -128(%rsp), %rsp; call *%r11; leaq 128(%rsp), %rsp; jmp 8f; \
+    7: syscall; 8:
+
 # undef	DO_CALL
 # define DO_CALL(syscall_name, args, ulong_arg_1, ulong_arg_2) \
     DOARGS_##args				\
     ZERO_EXTEND_##ulong_arg_1			\
     ZERO_EXTEND_##ulong_arg_2			\
     movl $SYS_ify (syscall_name), %eax;		\
-    syscall;
+    DIFUSE_SYSCALL
 
 # define DOARGS_0 /* nothing */
 # define DOARGS_1 /* nothing */
@@ -219,6 +237,39 @@
 
 /* Registers clobbered by syscall.  */
 # define REGISTERS_CLOBBERED_BY_SYSCALL "cc", "r11", "cx"
+
+/* DIFUSE: the syscall stub ld.so got in AT_DIFUSE_SYSCALL, or 0.  While it
+   is set, syscalls call it instead of executing `syscall' (see the
+   assembler DO_CALL above), except those the kernel would run as raw
+   syscalls anyway, which skip the round trip when their number is known
+   at compile time.  */
+extern unsigned long int _dl_difuse_syscall;
+rtld_hidden_proto (_dl_difuse_syscall)
+
+# define DIFUSE_RAW_NR(nr) \
+  ((nr) == 14 /* rt_sigprocmask */ || (nr) == 15 /* rt_sigreturn */	\
+   || (nr) == 24 /* sched_yield */ || (nr) == 35 /* nanosleep */	\
+   || (nr) == 39 /* getpid */ || (nr) == 60 /* exit */			\
+   || (nr) == 186 /* gettid */ || (nr) == 202 /* futex */		\
+   || (nr) == 228 /* clock_gettime */ || (nr) == 230 /* clock_nanosleep */ \
+   || (nr) == 231 /* exit_group */ || (nr) == 234 /* tgkill */		\
+   || (nr) == 273 /* set_robust_list */ || (nr) == 334 /* rseq */)
+# define DIFUSE_STUB(nr) \
+  ((__builtin_constant_p (nr) && DIFUSE_RAW_NR (nr)) ? 0UL : _dl_difuse_syscall)
+
+/* The stub's address goes in r11, which the syscall clobbers anyway.  */
+# define DIFUSE_SYSCALL_INSN \
+  "testq %%r11, %%r11\n\t"						\
+  "jz 1f\n\t"								\
+  "leaq -128(%%rsp), %%rsp\n\t"						\
+  "call *%%r11\n\t"							\
+  "leaq 128(%%rsp), %%rsp\n\t"						\
+  "jmp 2f\n"								\
+  "1:\tsyscall\n"							\
+  "2:\n\t"
+# define DIFUSE_STUB_REG(nr) \
+  register unsigned long int _stub asm ("r11") = DIFUSE_STUB (nr)
+# define REGISTERS_CLOBBERED_BY_DIFUSE_SYSCALL "cc", "cx"
 
 /* NB: This also works when X is an array.  For an array X,  type of
    (X) - (X) is ptrdiff_t, which is signed, since size of ptrdiff_t
@@ -242,11 +293,12 @@
 #define internal_syscall0(number, dummy...)				\
 ({									\
     unsigned long int resultvar;					\
+    DIFUSE_STUB_REG (number);						\
     asm volatile (							\
-    "syscall\n\t"							\
-    : "=a" (resultvar)							\
+    DIFUSE_SYSCALL_INSN							\
+    : "=a" (resultvar), "+r" (_stub)				\
     : "0" (number)							\
-    : "memory", REGISTERS_CLOBBERED_BY_SYSCALL);			\
+    : "memory", REGISTERS_CLOBBERED_BY_DIFUSE_SYSCALL);			\
     (long int) resultvar;						\
 })
 
@@ -256,11 +308,12 @@
     unsigned long int resultvar;					\
     TYPEFY (arg1, __arg1) = ARGIFY (arg1);			 	\
     register TYPEFY (arg1, _a1) asm ("rdi") = __arg1;			\
+    DIFUSE_STUB_REG (number);						\
     asm volatile (							\
-    "syscall\n\t"							\
-    : "=a" (resultvar)							\
+    DIFUSE_SYSCALL_INSN							\
+    : "=a" (resultvar), "+r" (_stub)				\
     : "0" (number), "r" (_a1)						\
-    : "memory", REGISTERS_CLOBBERED_BY_SYSCALL);			\
+    : "memory", REGISTERS_CLOBBERED_BY_DIFUSE_SYSCALL);			\
     (long int) resultvar;						\
 })
 
@@ -272,11 +325,12 @@
     TYPEFY (arg1, __arg1) = ARGIFY (arg1);			 	\
     register TYPEFY (arg2, _a2) asm ("rsi") = __arg2;			\
     register TYPEFY (arg1, _a1) asm ("rdi") = __arg1;			\
+    DIFUSE_STUB_REG (number);						\
     asm volatile (							\
-    "syscall\n\t"							\
-    : "=a" (resultvar)							\
+    DIFUSE_SYSCALL_INSN							\
+    : "=a" (resultvar), "+r" (_stub)				\
     : "0" (number), "r" (_a1), "r" (_a2)				\
-    : "memory", REGISTERS_CLOBBERED_BY_SYSCALL);			\
+    : "memory", REGISTERS_CLOBBERED_BY_DIFUSE_SYSCALL);			\
     (long int) resultvar;						\
 })
 
@@ -290,11 +344,12 @@
     register TYPEFY (arg3, _a3) asm ("rdx") = __arg3;			\
     register TYPEFY (arg2, _a2) asm ("rsi") = __arg2;			\
     register TYPEFY (arg1, _a1) asm ("rdi") = __arg1;			\
+    DIFUSE_STUB_REG (number);						\
     asm volatile (							\
-    "syscall\n\t"							\
-    : "=a" (resultvar)							\
+    DIFUSE_SYSCALL_INSN							\
+    : "=a" (resultvar), "+r" (_stub)				\
     : "0" (number), "r" (_a1), "r" (_a2), "r" (_a3)			\
-    : "memory", REGISTERS_CLOBBERED_BY_SYSCALL);			\
+    : "memory", REGISTERS_CLOBBERED_BY_DIFUSE_SYSCALL);			\
     (long int) resultvar;						\
 })
 
@@ -310,11 +365,12 @@
     register TYPEFY (arg3, _a3) asm ("rdx") = __arg3;			\
     register TYPEFY (arg2, _a2) asm ("rsi") = __arg2;			\
     register TYPEFY (arg1, _a1) asm ("rdi") = __arg1;			\
+    DIFUSE_STUB_REG (number);						\
     asm volatile (							\
-    "syscall\n\t"							\
-    : "=a" (resultvar)							\
+    DIFUSE_SYSCALL_INSN							\
+    : "=a" (resultvar), "+r" (_stub)				\
     : "0" (number), "r" (_a1), "r" (_a2), "r" (_a3), "r" (_a4)		\
-    : "memory", REGISTERS_CLOBBERED_BY_SYSCALL);			\
+    : "memory", REGISTERS_CLOBBERED_BY_DIFUSE_SYSCALL);			\
     (long int) resultvar;						\
 })
 
@@ -332,12 +388,13 @@
     register TYPEFY (arg3, _a3) asm ("rdx") = __arg3;			\
     register TYPEFY (arg2, _a2) asm ("rsi") = __arg2;			\
     register TYPEFY (arg1, _a1) asm ("rdi") = __arg1;			\
+    DIFUSE_STUB_REG (number);						\
     asm volatile (							\
-    "syscall\n\t"							\
-    : "=a" (resultvar)							\
+    DIFUSE_SYSCALL_INSN							\
+    : "=a" (resultvar), "+r" (_stub)				\
     : "0" (number), "r" (_a1), "r" (_a2), "r" (_a3), "r" (_a4),		\
       "r" (_a5)								\
-    : "memory", REGISTERS_CLOBBERED_BY_SYSCALL);			\
+    : "memory", REGISTERS_CLOBBERED_BY_DIFUSE_SYSCALL);			\
     (long int) resultvar;						\
 })
 
@@ -357,12 +414,13 @@
     register TYPEFY (arg3, _a3) asm ("rdx") = __arg3;			\
     register TYPEFY (arg2, _a2) asm ("rsi") = __arg2;			\
     register TYPEFY (arg1, _a1) asm ("rdi") = __arg1;			\
+    DIFUSE_STUB_REG (number);						\
     asm volatile (							\
-    "syscall\n\t"							\
-    : "=a" (resultvar)							\
+    DIFUSE_SYSCALL_INSN							\
+    : "=a" (resultvar), "+r" (_stub)				\
     : "0" (number), "r" (_a1), "r" (_a2), "r" (_a3), "r" (_a4),		\
       "r" (_a5), "r" (_a6)						\
-    : "memory", REGISTERS_CLOBBERED_BY_SYSCALL);			\
+    : "memory", REGISTERS_CLOBBERED_BY_DIFUSE_SYSCALL);			\
     (long int) resultvar;						\
 })
 

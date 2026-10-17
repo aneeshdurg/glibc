@@ -744,6 +744,8 @@ rtld_hidden_proto (__libc_stack_end)
 extern int _dl_argc attribute_hidden attribute_relro;
 extern char **_dl_argv attribute_relro;
 rtld_hidden_proto (_dl_argv)
+/* DIFUSE: the syscall stub (AT_DIFUSE_SYSCALL), or 0 for raw syscalls.
+   Declared in sysdeps/unix/sysv/linux/x86_64/sysdep.h.  */
 #define rtld_progname _dl_argv[0]
 
 /* Flag set at startup and cleared when the last initializer has run.  */

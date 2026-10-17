@@ -22,6 +22,9 @@
 #include <ldsodefs.h>
 #include <link.h>
 
+/* DIFUSE: the syscall stub (see x86_64/sysdep.h).  */
+#define AT_DIFUSE_SYSCALL 0x44494655
+
 typedef ElfW(Addr) dl_parse_auxv_t[AT_MINSIGSTKSZ + 1];
 
 /* Copy the auxiliary vector into AUXV_VALUES and set up GLRO
@@ -41,6 +44,10 @@ void _dl_parse_auxv (ElfW(auxv_t) *av, dl_parse_auxv_t auxv_values)
   for (; av->a_type != AT_NULL; av++)
     if (av->a_type <= AT_MINSIGSTKSZ)
       auxv_values[av->a_type] = av->a_un.a_val;
+#ifdef AT_DIFUSE_SYSCALL
+    else if (av->a_type == AT_DIFUSE_SYSCALL)
+      _dl_difuse_syscall = av->a_un.a_val;
+#endif
 
   GLRO(dl_pagesize) = auxv_values[AT_PAGESZ];
   __libc_enable_secure = auxv_values[AT_SECURE];

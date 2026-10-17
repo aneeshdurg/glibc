@@ -160,6 +160,8 @@ static void process_envvars (struct dl_main_state *state);
 int _dl_argc attribute_relro attribute_hidden;
 char **_dl_argv attribute_relro = NULL;
 rtld_hidden_data_def (_dl_argv)
+unsigned long int _dl_difuse_syscall attribute_relro = 0;
+rtld_hidden_data_def (_dl_difuse_syscall)
 
 #ifndef THREAD_SET_STACK_GUARD
 /* Only exported for architectures that don't store the stack guard canary
