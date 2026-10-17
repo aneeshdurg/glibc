@@ -27,9 +27,7 @@ pkey_set (int key, unsigned int rights)
       __set_errno (EINVAL);
       return -1;
     }
-  unsigned int mask = 3 << (2 * key);
-  unsigned int pkru = pkey_read ();
-  pkru = (pkru & ~mask) | (rights << (2 * key));
-  pkey_write (pkru);
-  return 0;
+  /* DIFUSE: see arch-pkey.h.  */
+  __set_errno (ENOSYS);
+  return -1;
 }

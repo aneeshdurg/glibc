@@ -31,8 +31,6 @@ extern void TUNABLE_CALLBACK (set_hwcaps) (tunable_val_t *)
 
 #if defined SHARED
 extern void _dl_tlsdesc_dynamic_fxsave (void) attribute_hidden;
-extern void _dl_tlsdesc_dynamic_xsave (void) attribute_hidden;
-extern void _dl_tlsdesc_dynamic_xsavec (void) attribute_hidden;
 
 # ifdef __x86_64__
 #  include <dl-plt-rewrite.h>
@@ -61,8 +59,6 @@ extern void _dl_tlsdesc_dynamic_fnsave (void) attribute_hidden;
 
 #ifdef __x86_64__
 extern void _dl_runtime_resolve_fxsave (void) attribute_hidden;
-extern void _dl_runtime_resolve_xsave (void) attribute_hidden;
-extern void _dl_runtime_resolve_xsavec (void) attribute_hidden;
 #endif
 
 #ifdef __LP64__
@@ -1229,29 +1225,7 @@ no_cpuid:
 	       TUNABLE_CALLBACK (set_x86_shstk));
 #endif
 
-  if (MINIMUM_X86_ISA_LEVEL >= AVX_X86_ISA_LEVEL
-      || (GLRO(dl_x86_cpu_features).xsave_state_size != 0))
-    {
-      if (CPU_FEATURE_USABLE_P (cpu_features, XSAVEC))
-	{
-#ifdef __x86_64__
-	  GLRO(dl_x86_64_runtime_resolve) = _dl_runtime_resolve_xsavec;
-#endif
-#ifdef SHARED
-	  GLRO(dl_x86_tlsdesc_dynamic) = _dl_tlsdesc_dynamic_xsavec;
-#endif
-	}
-      else
-	{
-#ifdef __x86_64__
-	  GLRO(dl_x86_64_runtime_resolve) = _dl_runtime_resolve_xsave;
-#endif
-#ifdef SHARED
-	  GLRO(dl_x86_tlsdesc_dynamic) = _dl_tlsdesc_dynamic_xsave;
-#endif
-	}
-    }
-  else
+  /* DIFUSE: always the FXSAVE variants (dl-trampoline.S).  */
     {
 #ifdef __x86_64__
       GLRO(dl_x86_64_runtime_resolve) = _dl_runtime_resolve_fxsave;

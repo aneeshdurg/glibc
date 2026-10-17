@@ -79,26 +79,13 @@ _dl_tlsdesc_undefweak:
 	.size	_dl_tlsdesc_undefweak, .-_dl_tlsdesc_undefweak
 
 #ifdef SHARED
-# if MINIMUM_X86_ISA_LEVEL < AVX_X86_ISA_LEVEL
-#  define USE_FXSAVE
-#  define STATE_SAVE_ALIGNMENT	16
-#  define _dl_tlsdesc_dynamic	_dl_tlsdesc_dynamic_fxsave
-#  include "dl-tlsdesc-dynamic.h"
-#  undef _dl_tlsdesc_dynamic
-#  undef USE_FXSAVE
-# endif
-
-# define USE_XSAVE
-# define STATE_SAVE_ALIGNMENT	64
-# define _dl_tlsdesc_dynamic	_dl_tlsdesc_dynamic_xsave
+/* DIFUSE: no XSAVE/XSAVEC variants (see dl-trampoline.S).  The FXSAVE
+   one doesn't keep the upper halves of the vector registers across the
+   slow path, which only TLS descriptors (-mtls-dialect=gnu2) take.  */
+# define USE_FXSAVE
+# define STATE_SAVE_ALIGNMENT	16
+# define _dl_tlsdesc_dynamic	_dl_tlsdesc_dynamic_fxsave
 # include "dl-tlsdesc-dynamic.h"
 # undef _dl_tlsdesc_dynamic
-# undef USE_XSAVE
-
-# define USE_XSAVEC
-# define STATE_SAVE_ALIGNMENT	64
-# define _dl_tlsdesc_dynamic	_dl_tlsdesc_dynamic_xsavec
-# include "dl-tlsdesc-dynamic.h"
-# undef _dl_tlsdesc_dynamic
-# undef USE_XSAVEC
+# undef USE_FXSAVE
 #endif /* SHARED */

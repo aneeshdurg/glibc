@@ -77,28 +77,14 @@
 # endif
 #endif /* SHARED */
 
-#if MINIMUM_X86_ISA_LEVEL < AVX_X86_ISA_LEVEL
-# define USE_FXSAVE
-# define STATE_SAVE_ALIGNMENT	16
-# define _dl_runtime_resolve	_dl_runtime_resolve_fxsave
-# include "dl-trampoline.h"
-# undef _dl_runtime_resolve
-# undef USE_FXSAVE
-# undef STATE_SAVE_ALIGNMENT
-#endif
-
-#define USE_XSAVE
-#define STATE_SAVE_ALIGNMENT	64
-#define _dl_runtime_resolve	_dl_runtime_resolve_xsave
+/* DIFUSE: no XSAVE/XSAVEC variants.  XRSTOR loads PKRU when the mask in
+   edx:eax asks for it, so any XRSTOR in the plugin's code would let it
+   leave its protection key domain.  This ld.so binds eagerly
+   (rtld.c, _dl_lazy), so the resolver isn't used anyway.  */
+#define USE_FXSAVE
+#define STATE_SAVE_ALIGNMENT	16
+#define _dl_runtime_resolve	_dl_runtime_resolve_fxsave
 #include "dl-trampoline.h"
 #undef _dl_runtime_resolve
-#undef USE_XSAVE
-#undef STATE_SAVE_ALIGNMENT
-
-#define USE_XSAVEC
-#define STATE_SAVE_ALIGNMENT	64
-#define _dl_runtime_resolve	_dl_runtime_resolve_xsavec
-#include "dl-trampoline.h"
-#undef _dl_runtime_resolve
-#undef USE_XSAVEC
+#undef USE_FXSAVE
 #undef STATE_SAVE_ALIGNMENT

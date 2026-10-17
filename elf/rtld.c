@@ -358,7 +358,9 @@ struct rtld_global_ro _rtld_global_ro attribute_relro =
     ._dl_sysinfo = DL_SYSINFO_DEFAULT,
 #endif
     ._dl_debug_fd = STDERR_FILENO,
-    ._dl_lazy = 1,
+    /* DIFUSE: bind eagerly, so the plugin never needs a lazy resolver
+       (sysdeps/x86_64/dl-trampoline.S).  */
+    ._dl_lazy = 0,
     ._dl_fpu_control = _FPU_DEFAULT,
     ._dl_pagesize = EXEC_PAGESIZE,
     ._dl_inhibit_cache = 0,

@@ -29,12 +29,8 @@ pkey_read (void)
   return result;
 }
 
-/* Overwrite the PKRU register with VALUE.  */
-static inline void
-pkey_write (unsigned int value)
-{
-  __asm__ volatile (".byte 0x0f, 0x01, 0xef"
-                    : : "a" (value), "c" (0), "d" (0));
-}
+/* DIFUSE: no pkey_write.  This libc runs DIFUSE's plugin, which must not
+   execute WRPKRU: PKRU is what keeps it out of the application's memory
+   (and pkey_set fails).  */
 
 #endif /* _ARCH_PKEY_H */
